@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -eq 0 ]]; then # show the user a help message
+    echo "To edit a commit's content and/or message, invoke this script as:"
+    echo " \$ $0 <commit-ish-to-edit>"
+    echo "Any of these examples should work:"
+    echo " \$ $0 c71276fbb142e320a2fef03fd7bb35dc9890b609"
+    echo " \$ $0 c71276f"
+    echo " \$ $0 HEAD^^^"
+    echo "This script will begin an interactive git rebase, and drop you into a"
+    echo "shell immediately after the commit you specified has been applied."
+    echo 'It has *not* been extensively tested!'
+    exit 127
+
+elif [[ $# -eq 1 ]]; then # we're being invoked for the first time, directly by the user
+    export GIT_SEQUENCE_EDITOR="$0 $1"
+    git rebase -i "$1"^
+
+elif [[ $# -eq 2 ]]; then # this is the sub-invocation 
+    ID="$(git rev-parse --verify --short $1)"
+    export TODO_FILE="$2"
+
+    TMP_FILE="$(mktemp)"
+    trap 'rm -f "$TMP_FILE"' EXIT
+    cat "$TODO_FILE" >"$TMP_FILE"
+
+    awk -v id="$ID" \
+        '$2==id{$1="edit"}{print}' \
+        "$TMP_FILE" \
+    >"$TODO_FILE"
+
+else # we don't know how we got here
+    echo "Something went wrong ..." >&2
+    exit 1
+fi
